@@ -19,6 +19,7 @@ db.once("open", console.log.bind(console, "connected to mongoDB"));
 // Schema
 const UrlShortenerSchema = new mongoose.Schema({
   url: String,
+  urlShort: Number,
 });
 
 // Model
@@ -51,28 +52,32 @@ app.post("/api/shorturl/", (req, res) => {
   } catch (error) {
     res.json({ error: "invalid url" });
   }
-  dns.lookup(urlObject.hostname, (err, address) => {
+  dns.lookup(urlObject.hostname, async (err, address) => {
     if (err) {
       res.json({ error: "hostname error" });
     } else {
-      const existingUrlQuery = UrlModel.findOne({ url: urlObject.href });
+      const existingUrlQuery = urlModel.findOne({ url: urlInput });
       console.log("test 1");
       try {
         console.log("test 2");
-        const existingUrl = existingUrlQuery.exec();
+        const existingUrl = await existingUrlQuery.exec();
         console.log("test 3");
         if (existingUrl) {
-          console.log("url en db");
+          console.log("url deja en db");
           console.log(existingUrl);
           res.json({
             original_url: existingUrl.url,
-            short_url: existingUrl._id,
+            short_url: existingUrl.urlShort,
           });
         } else {
           console.log("création nouvelle url");
-          const newUrl = new urlModel({ url: urlInput });
+          const urlId = Math.floor(Math.random() * 9999) + 1;
+          while (urlModel.findOne({ urlShort: urlId })) {
+            urlId = Math.floor(Math.random() * 9999) + 1;
+          }
+          const newUrl = new urlModel({ url: urlInput, urlShort: urlId });
           newUrl.save();
-          res.json({ original_url: newUrl.url, short_url: newUrl._id });
+          res.json({ original_url: newUrl.url, short_url: newUrl.urlShort });
         }
       } catch (error) {
         res.json({ error: "database error try/catch" });
