@@ -52,38 +52,47 @@ app.post("/api/shorturl/", (req, res) => {
   } catch (error) {
     res.json({ error: "invalid url" });
   }
-  dns.lookup(urlObject.hostname, async (err, address) => {
-    if (err) {
-      res.json({ error: "hostname error" });
-    } else {
-      const existingUrlQuery = urlModel.findOne({ url: urlInput });
-      console.log("test 1");
-      try {
-        console.log("test 2");
-        const existingUrl = await existingUrlQuery.exec();
-        console.log("test 3");
-        if (existingUrl) {
-          console.log("url deja en db");
-          console.log(existingUrl);
-          res.json({
-            original_url: existingUrl.url,
-            short_url: existingUrl.urlShort,
-          });
-        } else {
-          console.log("création nouvelle url");
-          const urlId = Math.floor(Math.random() * 9999) + 1;
-          while (urlModel.findOne({ urlShort: urlId })) {
-            urlId = Math.floor(Math.random() * 9999) + 1;
+  if (urlObject) {
+    dns.lookup(urlObject.hostname, async (err, address) => {
+      if (err) {
+        res.json({ error: "invalid url" });
+      } else {
+        const existingUrlQuery = urlModel.findOne({ url: urlInput });
+        try {
+          const existingUrl = await existingUrlQuery.exec();
+          if (existingUrl) {
+            console.log("url deja en db");
+            console.log(existingUrl);
+            res.json({
+              original_url: existingUrl.url,
+              short_url: existingUrl.urlShort,
+            });
+          } else {
+            const urlId = Math.floor(Math.random() * 9999) + 1;
+            console.log(urlId);
+            while (await urlModel.findOne({ urlShort: urlId }).exec()) {
+              urlId = Math.floor(Math.random() * 9999) + 1;
+            }
+            const newUrl = new urlModel({ url: urlInput, urlShort: urlId });
+            newUrl.save();
+            res.json({ original_url: newUrl.url, short_url: newUrl.urlShort });
           }
-          const newUrl = new urlModel({ url: urlInput, urlShort: urlId });
-          newUrl.save();
-          res.json({ original_url: newUrl.url, short_url: newUrl.urlShort });
+        } catch (error) {
+          res.json({ error: "database error try/catch" });
         }
-      } catch (error) {
-        res.json({ error: "database error try/catch" });
       }
-    }
-  });
+    });
+  }
+});
+
+app.get("/api/shorturl/:urlShort", async (req, res) => {
+  const urlId = req.params.urlShort;
+  const url = await urlModel.findOne({ urlShort: urlId }).exec();
+  if (url) {
+    res.redirect(url.url);
+  } else {
+    res.json({ error: "url not found" });
+  }
 });
 
 app.listen(port, function () {
